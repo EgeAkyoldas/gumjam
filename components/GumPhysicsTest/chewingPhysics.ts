@@ -39,34 +39,25 @@ export const CHEW_ZONES = {
 }
 
 // Çiğneme durumu tipleri
-export type ChewType = 'perfect' | 'good' | 'early' | 'late' | 'none'
+export type ChewType = 'none' | 'perfect' | 'good' | 'early' | 'late'
 
 // Çiğneme bölgesi hesaplama
 export const calculateChewZone = (
-  gumPosition: number,   // Sakızın Y pozisyonu
-  jawPosition: number,   // Hedef çenenin Y pozisyonu
-  direction: 'up' | 'down' // Sakızın hareket yönü
+  gumPosition: number,
+  jawPosition: number
 ): ChewType => {
   const distance = Math.abs(gumPosition - jawPosition)
   const zones = CHEW_ZONES.ZONE_SIZES
 
-  // Önce mesafeye göre bölge kontrolü
   if (distance <= zones.PERFECT_END) {
-    // Perfect bölgesi (0-10px)
     return 'perfect'
   } else if (distance <= zones.GOOD_END) {
-    // Good bölgesi (10-30px)
     return 'good'
   } else if (distance <= zones.EARLY_END) {
-    // Early/Late kontrolü
-    if (direction === 'up') {
-      return gumPosition > jawPosition ? 'late' : 'early'
-    } else {
-      return gumPosition < jawPosition ? 'late' : 'early'
-    }
+    return 'early'
+  } else {
+    return 'late'
   }
-
-  return 'none'
 }
 
 // Çiğneme durumuna göre renk belirleme
@@ -77,6 +68,7 @@ export const getChewZoneColor = (chewType: ChewType): string => {
     case 'good':
       return 'bg-yellow-400'
     case 'early':
+      return 'bg-orange-400'
     case 'late':
       return 'bg-red-400'
     default:
@@ -90,8 +82,9 @@ export const calculateChewScore = (chewType: ChewType): number => {
     case 'perfect':
       return 100
     case 'good':
-      return 90
+      return 50
     case 'early':
+      return 0
     case 'late':
       return 10
     default:
@@ -108,6 +101,10 @@ export interface ChewingState {
   lastChewTime: number | null
   meterValue: number     // Meter değeri (0-100)
   lastChewType: ChewType // Son başarılı çiğneme tipi
+  shouldDamagePlayer: boolean // Oyuncuya hasar verilmeli mi?
+  shouldDamageGum: boolean    // Sakıza hasar verilmeli mi?
+  damageAmount: number        // Verilecek hasar miktarı
+  scoreAmount: number         // Kazanılacak puan
 }
 
 // Meter sabitleri
@@ -119,78 +116,197 @@ export const METER_CONSTANTS = {
   DECAY_INTERVAL: 100    // Azalma kontrol aralığı (ms)
 }
 
-// Meter değerini güncelle
-const updateMeterValue = (
-  currentValue: number,
-  chewType: ChewType,
-  timeDelta: number,
-  isBouncingNow: boolean = false
-): number => {
-  let newValue = currentValue
-
-  // Eğer sakız bouncing yapıyorsa ve önceden sarı/yeşil alanda chewlanmamışsa late olarak işaretle
-  if (isBouncingNow && chewType === 'none') {
-    return 0
+export const CHEW_CONSTANTS = {
+  DAMAGE: {
+    PERFECT: 15,    // Perfect çiğneme hasarı
+    GOOD: 10,       // Good çiğneme hasarı
+    EARLY: 0,       // Early durumunda hasar yok
+    SQUEEZE: 30     // Squeeze hasarı
+  },
+  SCORE: {
+    PERFECT: 100,   // Perfect skor
+    GOOD: 50,       // Good skor
+    EARLY: 0,       // Early'de skor yok
+    SQUEEZE: 200    // Squeeze bonus
+  },
+  COMBO: {
+    PERFECT_INCREASE: 1,
+    GOOD_INCREASE: 1,
+    EARLY_DECREASE: 1,
+    SQUEEZE_RESET: true
+  },
+  SQUEEZE: {
+    COMBO_THRESHOLD: 3,
+    MAX_DURATION: 2000,
+    COMPRESSION_RATIO: 2.0
   }
-
-  // Late durumunda meter'ı sıfırla
-  if (chewType === 'late') {
-    return 0
-  }
-
-  // Başarılı çiğneme durumunda artış
-  if (chewType === 'perfect') {
-    newValue += METER_CONSTANTS.PERFECT_INCREASE
-  } else if (chewType === 'good') {
-    newValue += METER_CONSTANTS.GOOD_INCREASE
-  }
-
-  // Zaman bazlı azalma
-  newValue -= (METER_CONSTANTS.DECAY_RATE * timeDelta / 1000)
-
-  // Sınırlar içinde tut (maksimum 100)
-  return Math.min(METER_CONSTANTS.MAX_VALUE, Math.max(0, newValue))
 }
 
 // Çiğneme durumu güncelleme
 export const updateChewingState = (
-  gumPosition: number,
-  topJawPosition: number,
-  bottomJawPosition: number,
-  velocity: { x: number, y: number },
-  previousState?: ChewingState,
-  isBouncingNow: boolean = false
+  gumY: number,
+  topEdge: number,
+  bottomEdge: number,
+  velocity: { x: number; y: number },
+  currentState: ChewingState,
+  isBouncingNow: boolean,
+  isSqueezing: boolean = false
 ): ChewingState => {
-  const direction = velocity.y < 0 ? 'up' : 'down'
-  const activeJawPosition = direction === 'up' ? topJawPosition : bottomJawPosition
-  const chewType = calculateChewZone(gumPosition, activeJawPosition, direction)
-  
-  // Zaman farkını hesapla
-  const currentTime = Date.now()
-  const timeDelta = previousState?.lastChewTime 
-    ? currentTime - previousState.lastChewTime 
-    : 0
-
-  // Eğer bouncing oluyorsa ve önceden sarı/yeşil alanda chewlanmamışsa late olarak işaretle
-  const finalChewType = isBouncingNow && chewType === 'none' ? 'late' : chewType
-
-  // Meter değerini güncelle
-  const newMeterValue = updateMeterValue(
-    previousState?.meterValue ?? 0,
-    finalChewType,
-    timeDelta,
-    isBouncingNow
-  )
-
-  return {
-    topJaw: direction === 'up' ? finalChewType : 'none',
-    bottomJaw: direction === 'down' ? finalChewType : 'none',
-    currentScore: calculateChewScore(finalChewType),
-    combo: 0,
-    lastChewTime: currentTime,
-    meterValue: newMeterValue,
-    lastChewType: finalChewType === 'perfect' || finalChewType === 'good' 
-      ? finalChewType 
-      : (previousState?.lastChewType ?? 'none')
+  // Log detayları için tip
+  interface ChewLogDetails {
+    damage?: number
+    score?: number
+    playerDamage?: number
+    comboIncrease?: number
+    comboDecrease?: number
+    comboReset?: boolean
+    newCombo?: number
+    distances?: {
+      fromTop: number
+      fromBottom: number
+    }
   }
+
+  // Debug log için yardımcı fonksiyon
+  const logChewAction = (action: string, details: ChewLogDetails) => {
+    console.log(`%c[CHEW ACTION] ${action}`, 'color: #ff69b4', {
+      ...details,
+      timestamp: new Date().toISOString(),
+      gumPosition: gumY,
+      topEdge,
+      bottomEdge,
+      isBouncingNow,
+      isSqueezing,
+      currentCombo: currentState.combo
+    })
+  }
+
+  const newState: ChewingState = {
+    ...currentState,
+    shouldDamagePlayer: false,
+    shouldDamageGum: false,
+    damageAmount: 0,
+    scoreAmount: 0,
+    topJaw: 'none',    // Reset jaw states
+    bottomJaw: 'none'  // Reset jaw states
+  }
+
+  // Squeeze durumunda farklı davran
+  if (isSqueezing) {
+    newState.lastChewType = 'perfect'
+    newState.shouldDamageGum = true
+    newState.damageAmount = CHEW_CONSTANTS.DAMAGE.SQUEEZE
+    newState.scoreAmount = CHEW_CONSTANTS.SCORE.SQUEEZE
+    newState.combo = 0
+
+    logChewAction('SQUEEZE', {
+      damage: CHEW_CONSTANTS.DAMAGE.SQUEEZE,
+      score: CHEW_CONSTANTS.SCORE.SQUEEZE,
+      comboReset: true
+    })
+
+    return newState
+  }
+
+  // Hareket yönünü belirle
+  const direction = velocity.y < 0 ? 'up' : 'down'
+  
+  // Normal çiğneme kontrolü
+  const perfectZone = 20
+  const goodZone = 40
+  const earlyZone = 60
+
+  // Aktif çeneye olan mesafeyi hesapla
+  const activeJawDistance = direction === 'up' 
+    ? Math.abs(gumY - topEdge)
+    : Math.abs(gumY - bottomEdge)
+
+  // Çiğneme tipini belirle
+  let chewType: ChewType = 'none'
+  if (activeJawDistance <= perfectZone) {
+    chewType = 'perfect'
+  } else if (activeJawDistance <= goodZone) {
+    chewType = 'good'
+  } else if (activeJawDistance <= earlyZone) {
+    chewType = 'early'
+  } else {
+    chewType = 'late'
+  }
+
+  // Sadece aktif çenenin durumunu güncelle
+  if (direction === 'up') {
+    newState.topJaw = chewType
+    newState.bottomJaw = 'none'
+  } else {
+    newState.topJaw = 'none'
+    newState.bottomJaw = chewType
+  }
+
+  // Çiğneme zamanlaması kontrolü
+  if (isBouncingNow) {
+    const now = Date.now()
+
+    if (chewType === 'perfect') {
+      newState.lastChewType = 'perfect'
+      newState.shouldDamageGum = true
+      newState.shouldDamagePlayer = false
+      newState.damageAmount = CHEW_CONSTANTS.DAMAGE.PERFECT
+      newState.scoreAmount = CHEW_CONSTANTS.SCORE.PERFECT
+      newState.combo += CHEW_CONSTANTS.COMBO.PERFECT_INCREASE
+
+      logChewAction('PERFECT CHEW', {
+        damage: CHEW_CONSTANTS.DAMAGE.PERFECT,
+        score: CHEW_CONSTANTS.SCORE.PERFECT,
+        comboIncrease: CHEW_CONSTANTS.COMBO.PERFECT_INCREASE,
+        newCombo: newState.combo
+      })
+
+    } else if (chewType === 'good') {
+      newState.lastChewType = 'good'
+      newState.shouldDamageGum = true
+      newState.shouldDamagePlayer = false
+      newState.damageAmount = CHEW_CONSTANTS.DAMAGE.GOOD
+      newState.scoreAmount = CHEW_CONSTANTS.SCORE.GOOD
+      newState.combo += CHEW_CONSTANTS.COMBO.GOOD_INCREASE
+
+      logChewAction('GOOD CHEW', {
+        damage: CHEW_CONSTANTS.DAMAGE.GOOD,
+        score: CHEW_CONSTANTS.SCORE.GOOD,
+        comboIncrease: CHEW_CONSTANTS.COMBO.GOOD_INCREASE,
+        newCombo: newState.combo
+      })
+
+    } else if (chewType === 'early') {
+      newState.lastChewType = 'early'
+      newState.shouldDamageGum = false
+      newState.shouldDamagePlayer = false
+      newState.combo = Math.max(0, newState.combo - CHEW_CONSTANTS.COMBO.EARLY_DECREASE)
+
+      logChewAction('EARLY CHEW', {
+        comboDecrease: CHEW_CONSTANTS.COMBO.EARLY_DECREASE,
+        newCombo: newState.combo
+      })
+
+    } else if (chewType === 'late') {
+      // Sadece 'late' durumunda oyuncu hasar alır
+      newState.lastChewType = 'late'
+      newState.shouldDamagePlayer = true
+      newState.shouldDamageGum = false
+      newState.combo = 0
+      newState.scoreAmount = 0
+
+      logChewAction('LATE CHEW', {
+        playerDamage: 1,
+        comboReset: true,
+        distances: {
+          fromTop: Math.abs(gumY - topEdge),
+          fromBottom: Math.abs(gumY - bottomEdge)
+        }
+      })
+    }
+
+    newState.lastChewTime = now
+  }
+
+  return newState
 } 

@@ -1,5 +1,3 @@
-// components/Layout/ScoreCounter.tsx
-
 import { useGameState } from "../GameState/GameContext"
 
 export function ScoreCounter() {

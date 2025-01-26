@@ -1,5 +1,3 @@
-// components/Layout/LivesTracker.tsx
-
 import { Heart } from "lucide-react"
 import { useGameState } from "../GameState/GameContext"
 

@@ -66,7 +66,8 @@ export const useGameState = (): GameStateReturn => {
       const newState = { ...prev }
 
       // Oyuncu hasar alırsa ve oyun devam ediyorsa
-      if (shouldDamagePlayer && prev.gameStatus === 'playing') {
+      // VE üst çene ile temas durumu değilse
+      if (shouldDamagePlayer && prev.gameStatus === 'playing' && chewType !== 'none') {
         // Hasar cooldown kontrolü
         const now = Date.now()
         const canTakeDamage = !prev.lastCollisionTime || 

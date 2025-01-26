@@ -1,24 +1,25 @@
 export const PHYSICS_CONSTANTS = {
   // Çiğneme açı sınırları
-  MIN_ANGLE: Math.PI / 8,    // 22.5 derece - daha dar açı
-  MAX_ANGLE: Math.PI / 2.5,  // 72 derece - daha geniş açı
+  MIN_ANGLE: 3,             // 0 derece - tam yatay
+  MAX_ANGLE: 9,   // 360 derece - tam dönüş
   
   // Hız sabitleri
-  BASE_SPEED: 2.0,          // Temel hızı artırdım
-  MIN_SPEED: 1.0,           // Minimum hızı artırdım
-  MAX_SPEED: 5.0,           // Maksimum hızı artırdım
-  SPEED_DAMPING: 0.95,      // Sürtünmeyi artırdım
+  BASE_SPEED: 3.0,          // Temel hız artırıldı
+  MIN_SPEED: 1.5,           // Minimum hız artırıldı
+  MAX_SPEED: 5.0,           // Maximum hız artırıldı
+  SPEED_DAMPING: 0.995,     // Çok az sürtünme
   
   // Sıkışma sabitleri
-  COMPRESSION_RATIO: 1.5,    // Sıkışma oranını artırdım
-  MIN_COMPRESSION: 1.2,      // Minimum sıkışmayı artırdım
-  MAX_COMPRESSION: 1.8,      // Maksimum sıkışmayı artırdım
+  COMPRESSION_RATIO: 1.4,    // Daha fazla sıkışma
+  MIN_COMPRESSION: 1.1,      // Minimum sıkışma
+  MAX_COMPRESSION: 1.6,      // Maximum sıkışma artırıldı
   
   // Çarpışma sabitleri
-  BOUNCE_THRESHOLD: 8,       // Çarpışma eşiğini artırdım
-  EDGE_BUFFER: 3,           // Kenar güvenliğini artırdım
+  BOUNCE_THRESHOLD: 3,       // Daha hassas çarpışma algılama
+  EDGE_BUFFER: 2,           // Kenar tamponu
   
-  // Yeni sabitler
-  REBOUND_VARIATION: 0.2,    // Sekme varyasyonu
-  VELOCITY_RETENTION: 0.7    // Hız koruma oranı
+  // Fizik sabitleri
+  ELASTICITY: 0.98,         // Daha yüksek elastiklik
+  VELOCITY_RETENTION: 0.99,  // Daha yüksek hız korunumu
+  REBOUND_VARIATION: 0.4     // Çok daha fazla rastgele sekme
 } as const 

@@ -1,5 +1,3 @@
-// components/GameState/GameContext.tsx
-
 "use client"
 
 import { createContext, useContext, useReducer, type ReactNode } from "react"
@@ -14,6 +12,9 @@ interface GameState {
   tonguePosition: "left" | "center" | "right"
   gumPosition: { x: number; y: number }
   gumVelocity: { x: number; y: number }
+  gumSpeed: number
+  upperBoundary: number
+  lowerBoundary: number
 }
 
 type GameAction =
@@ -29,6 +30,10 @@ type GameAction =
   | { type: "MOVE_TONGUE"; payload: "left" | "center" | "right" }
   | { type: "UPDATE_GUM_POSITION"; payload: { x: number; y: number } }
   | { type: "UPDATE_GUM_VELOCITY"; payload: { x: number; y: number } }
+  | { type: "UPDATE_GUM_SPEED"; payload: number }
+  | { type: "UPDATE_UPPER_BOUNDARY"; payload: number }
+  | { type: "UPDATE_LOWER_BOUNDARY"; payload: number }
+  | { type: "TAKE_DAMAGE"; payload: number }
 
 const initialState: GameState = {
   score: 0,
@@ -40,6 +45,9 @@ const initialState: GameState = {
   tonguePosition: "center",
   gumPosition: { x: 0, y: 0 },
   gumVelocity: { x: 0, y: 0 },
+  gumSpeed: 1, // Changed from 5 to 1
+  upperBoundary: 0.22, // Changed from 0.3 to 0.22 (22%)
+  lowerBoundary: 0.63, // Changed from 0.7 to 0.63 (63%)
 }
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
@@ -68,6 +76,19 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       return { ...state, gumPosition: action.payload }
     case "UPDATE_GUM_VELOCITY":
       return { ...state, gumVelocity: action.payload }
+    case "UPDATE_GUM_SPEED":
+      return { ...state, gumSpeed: action.payload }
+    case "UPDATE_UPPER_BOUNDARY":
+      return { ...state, upperBoundary: action.payload }
+    case "UPDATE_LOWER_BOUNDARY":
+      return { ...state, lowerBoundary: action.payload }
+    case "TAKE_DAMAGE":
+      const newLives = state.lives - action.payload
+      return {
+        ...state,
+        lives: newLives,
+        isPlaying: newLives > 0, // Game over if lives reach 0
+      }
     default:
       return state
   }

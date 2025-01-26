@@ -1,5 +1,3 @@
-// components/Mouth/LowerJaw.tsx
-
 "use client"
 
 import { useGameState } from "../GameState/GameContext"

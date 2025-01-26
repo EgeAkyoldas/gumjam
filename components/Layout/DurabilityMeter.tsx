@@ -1,5 +1,3 @@
-// components/Layout/DurabilityMeter.tsx
-
 import { useGameState } from "../GameState/GameContext"
 
 export function DurabilityMeter() {

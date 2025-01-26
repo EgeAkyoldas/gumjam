@@ -8,9 +8,8 @@ interface PhysicsState {
   velocity: { x: number; y: number }
   scale: { x: number; y: number }
   isPaused: boolean
-  lastVelocity: { x: number; y: number }
-  isMoving: boolean
   isBouncing: boolean
+  lastBounceTime: number
 }
 
 // Hook için dönüş tipi
@@ -34,9 +33,8 @@ const initialPhysicsState: PhysicsState = {
   velocity: { ...initialVelocity },
   scale: { x: 1, y: 1 },
   isPaused: true,
-  lastVelocity: { ...initialVelocity },
-  isMoving: false,
-  isBouncing: false
+  isBouncing: false,
+  lastBounceTime: 0
 }
 
 export const usePhysicsEngine = (): PhysicsEngineReturn => {
@@ -44,26 +42,19 @@ export const usePhysicsEngine = (): PhysicsEngineReturn => {
 
   // Rastgele hız hesaplama
   const calculateRandomVelocity = useCallback((baseSpeed: number = PHYSICS_CONSTANTS.BASE_SPEED, currentVelocity?: { x: number; y: number }) => {
-    const angle = PHYSICS_CONSTANTS.MIN_ANGLE + 
-      (PHYSICS_CONSTANTS.MAX_ANGLE - PHYSICS_CONSTANTS.MIN_ANGLE) * Math.random()
-    
-    // Eğer mevcut hız varsa, yönü koruyarak varyasyon ekle
+    // Eğer mevcut hız varsa, sadece dikey yönde sekme uygula
     if (currentVelocity) {
-      const currentAngle = Math.atan2(currentVelocity.y, currentVelocity.x)
-      const variation = (Math.random() - 0.5) * 2 * PHYSICS_CONSTANTS.REBOUND_VARIATION
-      const newAngle = currentAngle + variation
-      
+      // Dikey hızı koru, yatay hızı sıfırla
       return {
-        x: baseSpeed * Math.cos(newAngle),
-        y: baseSpeed * Math.sin(newAngle)
+        x: 0,
+        y: baseSpeed * (currentVelocity.y > 0 ? -1 : 1)
       }
     }
     
-    // Yeni rastgele yön
-    const direction = Math.random() > 0.5 ? 1 : -1
+    // Başlangıç için sadece aşağı yönlü hareket
     return {
-      x: baseSpeed * Math.cos(angle) * direction,
-      y: baseSpeed * Math.sin(angle)
+      x: 0,
+      y: baseSpeed // Her zaman aşağı yönlü başla
     }
   }, [])
 
@@ -74,92 +65,79 @@ export const usePhysicsEngine = (): PhysicsEngineReturn => {
   ) => {
     setPhysics(prev => {
       const newPhysics = { ...prev }
+      const now = Date.now()
       
       if (newPhysics.isPaused) {
         return newPhysics
       }
 
-      if (isSpacePressed) {
-        // Space basılıyken sakızı çeneler arasında tut
-        const targetY = jawPositions.topEdge + GAME_CONSTANTS.GUM_SIZE / 2
-        newPhysics.position.y = targetY
-        
-        // Sakızı sıkıştır
-        newPhysics.scale = {
-          x: PHYSICS_CONSTANTS.COMPRESSION_RATIO,
-          y: 1 / PHYSICS_CONSTANTS.COMPRESSION_RATIO
-        }
-        
-        return newPhysics
-      }
-      
-      // Normal fizik güncellemeleri
-      // Hız sınırlaması
-      const speed = Math.sqrt(newPhysics.velocity.x ** 2 + newPhysics.velocity.y ** 2)
-      if (speed > PHYSICS_CONSTANTS.MAX_SPEED) {
-        const scale = PHYSICS_CONSTANTS.MAX_SPEED / speed
-        newPhysics.velocity.x *= scale
-        newPhysics.velocity.y *= scale
-      } else if (speed < PHYSICS_CONSTANTS.MIN_SPEED && speed > 0) {
-        const scale = PHYSICS_CONSTANTS.MIN_SPEED / speed
-        newPhysics.velocity.x *= scale
-        newPhysics.velocity.y *= scale
-      }
-
-      // Sürtünme uygulaması
-      newPhysics.velocity.x *= PHYSICS_CONSTANTS.SPEED_DAMPING
+      // Sürtünme etkisi (sadece dikey)
       newPhysics.velocity.y *= PHYSICS_CONSTANTS.SPEED_DAMPING
       
-      // Pozisyon güncelleme
-      newPhysics.position.x += newPhysics.velocity.x
+      // Hız sınırlaması (sadece dikey)
+      const speed = Math.abs(newPhysics.velocity.y)
+      if (speed > PHYSICS_CONSTANTS.MAX_SPEED) {
+        newPhysics.velocity.y *= PHYSICS_CONSTANTS.MAX_SPEED / speed
+      } else if (speed < PHYSICS_CONSTANTS.MIN_SPEED && speed > 0) {
+        newPhysics.velocity.y *= PHYSICS_CONSTANTS.MIN_SPEED / speed
+      }
+
+      // Pozisyon güncelleme (sadece dikey)
       newPhysics.position.y += newPhysics.velocity.y
       
-      // Duvar çarpışmaları (x ekseni)
-      if (newPhysics.position.x <= 0 || newPhysics.position.x >= GAME_CONSTANTS.GAME_WIDTH) {
-        newPhysics.velocity.x *= -1
-        newPhysics.position.x = newPhysics.position.x <= 0 ? 0 : GAME_CONSTANTS.GAME_WIDTH
-      }
-      
-      // Top sekme kontrolü
+      // Çene çarpışmaları
       let isBouncingNow = false
+      const bounceCooldown = 100 // ms
+      const canBounce = now - newPhysics.lastBounceTime > bounceCooldown
       
-      // Üst sekme noktası
-      if (newPhysics.position.y <= jawPositions.topEdge) {
+      // Üst çene çarpışması
+      if (newPhysics.position.y <= jawPositions.topEdge && canBounce) {
         isBouncingNow = true
+        newPhysics.lastBounceTime = now
         
-        // Mevcut hızı kullanarak yeni hız hesapla
-        const currentSpeed = Math.sqrt(newPhysics.velocity.x ** 2 + newPhysics.velocity.y ** 2)
-        const retainedSpeed = currentSpeed * PHYSICS_CONSTANTS.VELOCITY_RETENTION
-        const newVelocity = calculateRandomVelocity(retainedSpeed, newPhysics.velocity)
+        // Çarpışma hızını hesapla ve yeni hız vektörü oluştur
+        const currentSpeed = Math.abs(newPhysics.velocity.y)
+        const bounceSpeed = Math.max(currentSpeed * PHYSICS_CONSTANTS.ELASTICITY, PHYSICS_CONSTANTS.MIN_SPEED)
         
+        // Sadece dikey yönde sekme
         newPhysics.velocity = {
-          x: newVelocity.x,
-          y: Math.abs(newVelocity.y) // Aşağı yönlendir
+          x: 0,
+          y: Math.abs(bounceSpeed) // Aşağı yönlendir
         }
+        
         newPhysics.position.y = jawPositions.topEdge
       }
       
-      // Alt sekme noktası
-      if (newPhysics.position.y >= jawPositions.bottomEdge) {
+      // Alt çene çarpışması
+      if (newPhysics.position.y >= jawPositions.bottomEdge && canBounce) {
         isBouncingNow = true
+        newPhysics.lastBounceTime = now
         
-        // Mevcut hızı kullanarak yeni hız hesapla
-        const currentSpeed = Math.sqrt(newPhysics.velocity.x ** 2 + newPhysics.velocity.y ** 2)
-        const retainedSpeed = currentSpeed * PHYSICS_CONSTANTS.VELOCITY_RETENTION
-        const newVelocity = calculateRandomVelocity(retainedSpeed, newPhysics.velocity)
+        // Her durumda bounce et
+        const currentSpeed = Math.abs(newPhysics.velocity.y)
+        const bounceSpeed = Math.max(currentSpeed * PHYSICS_CONSTANTS.ELASTICITY, PHYSICS_CONSTANTS.MIN_SPEED)
         
+        // Sadece dikey yönde sekme
         newPhysics.velocity = {
-          x: newVelocity.x,
-          y: -Math.abs(newVelocity.y) // Yukarı yönlendir
+          x: 0,
+          y: -Math.abs(bounceSpeed) // Yukarı yönlendir
         }
+        
+        // Space basılıyken ekstra sıkışma efekti
+        if (isSpacePressed) {
+          newPhysics.scale = {
+            x: PHYSICS_CONSTANTS.COMPRESSION_RATIO * 1.2,
+            y: 1 / (PHYSICS_CONSTANTS.COMPRESSION_RATIO * 1.2)
+          }
+        }
+        
         newPhysics.position.y = jawPositions.bottomEdge
       }
 
       // Sakız şekil değişimi
       if (isBouncingNow) {
-        // Hıza bağlı sıkışma oranı
-        const speed = Math.sqrt(newPhysics.velocity.x ** 2 + newPhysics.velocity.y ** 2)
-        const speedRatio = Math.min(speed / PHYSICS_CONSTANTS.MAX_SPEED, 1)
+        // Çarpışma hızına bağlı sıkışma
+        const speedRatio = Math.min(Math.abs(newPhysics.velocity.y) / PHYSICS_CONSTANTS.MAX_SPEED, 1)
         const dynamicCompression = PHYSICS_CONSTANTS.MIN_COMPRESSION + 
           (PHYSICS_CONSTANTS.MAX_COMPRESSION - PHYSICS_CONSTANTS.MIN_COMPRESSION) * speedRatio
         
@@ -169,14 +147,14 @@ export const usePhysicsEngine = (): PhysicsEngineReturn => {
         }
       } else {
         // Kademeli şekil düzeltme
+        const returnSpeed = 0.1
         newPhysics.scale = {
-          x: 1 + (newPhysics.scale.x - 1) * 0.9,
-          y: 1 + (newPhysics.scale.y - 1) * 0.9
+          x: 1 + (newPhysics.scale.x - 1) * (1 - returnSpeed),
+          y: 1 + (newPhysics.scale.y - 1) * (1 - returnSpeed)
         }
       }
 
       newPhysics.isBouncing = isBouncingNow
-      newPhysics.isMoving = speed > 0
       
       return newPhysics
     })
@@ -184,14 +162,15 @@ export const usePhysicsEngine = (): PhysicsEngineReturn => {
 
   // Fizik durumunu sıfırlama
   const resetPhysics = useCallback(() => {
-    // Random spawn position
-    const randomX = Math.random() * (GAME_CONSTANTS.GAME_WIDTH - 200) + 100
-    const randomY = Math.random() * 200 + 200
+    // Oyun alanının ortasından başla
+    const startX = GAME_CONSTANTS.GAME_WIDTH / 2
+    const startY = GAME_CONSTANTS.JAW_POSITIONS.TOP + 100 // Üst çeneden biraz aşağıda
 
     setPhysics({
       ...initialPhysicsState,
-      position: { x: randomX, y: randomY },
-      velocity: calculateRandomVelocity()
+      position: { x: startX, y: startY },
+      velocity: calculateRandomVelocity(),
+      lastBounceTime: 0
     })
   }, [calculateRandomVelocity])
 

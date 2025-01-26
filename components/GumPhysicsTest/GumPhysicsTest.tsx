@@ -10,7 +10,6 @@ import { PlayerTest } from './components/status/PlayerTest'
 
 import { usePhysicsEngine } from './core/hooks/usePhysicsEngine'
 import { useChewingSystem } from './core/hooks/useChewingSystem'
-import { useSqueezeSystem } from './core/hooks/useSqueezeSystem'
 import { useGameState } from './core/hooks/useGameState'
 import { useGumState } from '../GameState/GumState'
 
@@ -34,14 +33,6 @@ export const GumPhysicsTest = () => {
     resetChewingState,
     getZoneColor
   } = useChewingSystem()
-
-  const {
-    squeezeState,
-    startSqueeze,
-    endSqueeze,
-    resetSqueezeState,
-    updateSqueezeState
-  } = useSqueezeSystem()
 
   const {
     gameState,
@@ -76,18 +67,12 @@ export const GumPhysicsTest = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !isSpacePressed && gameState.gameStatus === 'playing') {
         setIsSpacePressed(true)
-        if (squeezeState.isSqueezeReady) {
-          startSqueeze()
-        }
       }
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         setIsSpacePressed(false)
-        if (squeezeState.isSqueezing) {
-          endSqueeze()
-        }
       }
     }
 
@@ -98,7 +83,7 @@ export const GumPhysicsTest = () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [isSpacePressed, squeezeState, gameState.gameStatus])
+  }, [isSpacePressed, gameState.gameStatus])
 
   // Fizik güncellemesi
   useEffect(() => {
@@ -115,7 +100,7 @@ export const GumPhysicsTest = () => {
           { topEdge: jawPositions.top, bottomEdge: jawPositions.bottom },
           physics.velocity,
           physics.isBouncing,
-          physics.isSqueezing,
+          false, // isSqueezing kaldırıldı
           isSpacePressed
         )
 
@@ -130,11 +115,8 @@ export const GumPhysicsTest = () => {
           chewState.lastChewType,
           chewState.shouldDamagePlayer,
           chewState.scoreAmount,
-          false // Normal güncelleme, zafer değil
+          false
         )
-
-        // Squeeze durumunu güncelle
-        updateSqueezeState(chewState.combo)
       }
 
       animationFrameId = requestAnimationFrame(updateGame)
@@ -146,8 +128,7 @@ export const GumPhysicsTest = () => {
     gameState.gameStatus,
     isSpacePressed,
     physics,
-    chewState,
-    squeezeState
+    chewState
   ])
 
   // Oyunu başlatma
@@ -156,8 +137,7 @@ export const GumPhysicsTest = () => {
     resetGame()
     resetPhysics()
     resetChewingState()
-    resetSqueezeState()
-    gumState.resetHealth() // Sakızın canını sıfırla
+    gumState.resetHealth()
     
     // Oyunu başlat
     startGame()
@@ -169,8 +149,7 @@ export const GumPhysicsTest = () => {
     resetGame()
     resetPhysics()
     resetChewingState()
-    resetSqueezeState()
-    gumState.resetHealth() // Sakızın canını sıfırla
+    gumState.resetHealth()
     setPhysicsPaused(true)
     setIsSpacePressed(false)
   }
@@ -241,23 +220,6 @@ export const GumPhysicsTest = () => {
         }}
         chewState={chewState}
       />
-
-      {/* Squeeze Prompt */}
-      {squeezeState.isSqueezeReady && !squeezeState.isSqueezing && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-yellow-400 text-yellow-900 px-6 py-3 rounded-full font-bold text-xl animate-bounce">
-          SQUEEZE! SQUEEZE! SQUEEZE!
-        </div>
-      )}
-
-      {/* Squeeze Timer */}
-      {squeezeState.isSqueezing && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2">
-          <div 
-            className="bg-red-500 h-2 rounded-full transition-all duration-100" 
-            style={{ width: `${(2000 - squeezeState.squeezeTimer) / 20}%` }} 
-          />
-        </div>
-      )}
     </div>
   )
 } 

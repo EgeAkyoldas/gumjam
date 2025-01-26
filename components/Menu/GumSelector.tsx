@@ -1,5 +1,3 @@
-// components/Menu/GumSelector.tsx
-
 "use client"
 
 import { motion } from "framer-motion"

@@ -1,5 +1,3 @@
-// components/GameCanvas.tsx
-
 "use client"
 
 import { useRef, useEffect } from "react"

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { GAME_CONSTANTS } from '../constants/GameConstants'
-import { ChewType } from '../constants/ChewingConstants'
+import { ChewType, CHEW_ZONE_COLORS } from '../constants/ChewingConstants'
 
 // Oyun durumu için interface
 interface GameState {
@@ -14,6 +14,7 @@ interface GameState {
     bottom: string
   }
   gameStatus: 'idle' | 'playing' | 'ended'
+  isVictory: boolean
 }
 
 // Hook için dönüş tipi
@@ -22,7 +23,8 @@ interface GameStateReturn {
   updateGameState: (
     chewType: ChewType,
     shouldDamagePlayer: boolean,
-    scoreAmount: number
+    scoreAmount: number,
+    isVictory: boolean
   ) => void
   startGame: () => void
   endGame: () => void
@@ -38,10 +40,11 @@ const initialGameState: GameState = {
   isColliding: false,
   collisionType: 'none',
   platformColors: {
-    top: 'bg-white',
-    bottom: 'bg-white'
+    top: CHEW_ZONE_COLORS.NONE,
+    bottom: CHEW_ZONE_COLORS.NONE
   },
-  gameStatus: 'idle'
+  gameStatus: 'idle',
+  isVictory: false
 }
 
 export const useGameState = (): GameStateReturn => {
@@ -51,7 +54,8 @@ export const useGameState = (): GameStateReturn => {
   const updateGameState = useCallback((
     chewType: ChewType,
     shouldDamagePlayer: boolean,
-    scoreAmount: number
+    scoreAmount: number,
+    isVictory: boolean = false
   ) => {
     setGameState(prev => {
       // Eğer oyun bittiyse hiçbir şey yapma
@@ -95,6 +99,7 @@ export const useGameState = (): GameStateReturn => {
               sonChewType: chewType
             })
             newState.gameStatus = 'ended'
+            newState.isVictory = false
             newState.lives = 0 // Emin olmak için
           }
         } else {
@@ -110,6 +115,16 @@ export const useGameState = (): GameStateReturn => {
       // Skor güncelleme
       if (scoreAmount > 0) {
         newState.score += scoreAmount
+      }
+
+      // Zafer durumu kontrolü (sadece özel olarak belirtildiğinde)
+      if (isVictory && prev.gameStatus === 'playing') {
+        newState.gameStatus = 'ended'
+        newState.isVictory = true
+        console.log('%c[GAME] Zafer!', 'color: green', {
+          finalScore: newState.score + scoreAmount,
+          remainingLives: newState.lives
+        })
       }
 
       // Çarpışma tipi güncelleme
@@ -147,12 +162,8 @@ export const useGameState = (): GameStateReturn => {
     })
     
     setGameState(prev => ({
-      ...prev,
-      gameStatus: 'playing',
-      lives: GAME_CONSTANTS.INITIAL_VALUES.LIVES,
-      score: GAME_CONSTANTS.INITIAL_VALUES.SCORE,
-      isColliding: false,
-      lastCollisionTime: null
+      ...initialGameState,
+      gameStatus: 'playing'
     }))
   }, [])
 

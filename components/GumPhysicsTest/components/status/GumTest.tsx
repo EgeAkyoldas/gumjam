@@ -22,6 +22,7 @@ export const GumTest = ({ onVictory }: GumTestProps) => {
   // Sakızın ruh hali emojisi
   const getMoodEmoji = () => {
     if (showVictory) return '🎉'
+    if (health <= 0) return '💀'
     if (isLaughing) return '😈'
     if (healthPercentage > 60) return '😊'
     if (healthPercentage > 30) return '😟'
@@ -31,7 +32,7 @@ export const GumTest = ({ onVictory }: GumTestProps) => {
   return (
     <div className="p-4 bg-white/90 rounded-lg shadow-lg">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-bold text-pink-600">Sakız Sağlığı</span>
+        <span className="font-bold text-pink-600">Gumjam Health</span>
         <span className="text-sm text-gray-600">{Math.max(0, health)} / {maxHealth}</span>
       </div>
       
@@ -60,10 +61,10 @@ export const GumTest = ({ onVictory }: GumTestProps) => {
             className="mt-4 text-center"
           >
             <div className="text-2xl font-bold text-green-500 mb-2">
-              Tebrikler! 🎉
+              NICELY CHEWED
             </div>
             <div className="text-sm text-gray-600">
-              Sakızı başarıyla çiğnedin!
+              YOU WASTED THE GUM!
             </div>
           </motion.div>
         ) : (

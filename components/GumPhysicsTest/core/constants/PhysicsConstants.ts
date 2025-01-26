@@ -4,8 +4,8 @@ export const PHYSICS_CONSTANTS = {
   MAX_ANGLE: Math.PI / 2.5,  // 72 derece - daha geniş açı
   
   // Hız sabitleri
-  BASE_SPEED: 3.0,          // Temel hızı artırdım
-  MIN_SPEED: 2.0,           // Minimum hızı artırdım
+  BASE_SPEED: 2.0,          // Temel hızı artırdım
+  MIN_SPEED: 1.0,           // Minimum hızı artırdım
   MAX_SPEED: 5.0,           // Maksimum hızı artırdım
   SPEED_DAMPING: 0.95,      // Sürtünmeyi artırdım
   

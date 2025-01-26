@@ -4,12 +4,12 @@ export const CHEWING_CONSTANTS = {
     PERFECT: {
       SIZE: 15,     // Çeneye en yakın 15px
       SCORE: 100,
-      DAMAGE: 10    // Perfect vuruş hasarı
+      DAMAGE: 10    // Perfect vuruş hasarı artırıldı
     },
     GOOD: {
       SIZE: 25,     // Perfect'ten sonraki 25px
       SCORE: 50,
-      DAMAGE: 5     // Good vuruş hasarı
+      DAMAGE: 5     // Good vuruş hasarı artırıldı
     },
     EARLY: {
       SIZE: 150,    // Geri kalan tüm alan
@@ -20,7 +20,7 @@ export const CHEWING_CONSTANTS = {
     LATE: {
       SCORE: -50,
       DAMAGE: 0,    // Late'de hasar yok
-      HEALTH_PENALTY: 2
+      HEALTH_PENALTY: 1
     }
   },
 
@@ -37,7 +37,7 @@ export const CHEWING_CONSTANTS = {
   SQUEEZE: {
     COMBO_THRESHOLD: 7,
     MAX_DURATION: 2000,
-    DAMAGE: 30,
+    DAMAGE: 25,     // Squeeze hasarı ayarlandı
     SCORE: 200,
     COMPRESSION_RATIO: 2.0
   },

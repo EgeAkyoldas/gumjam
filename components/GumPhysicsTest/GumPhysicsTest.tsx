@@ -12,6 +12,7 @@ import { usePhysicsEngine } from './core/hooks/usePhysicsEngine'
 import { useChewingSystem } from './core/hooks/useChewingSystem'
 import { useSqueezeSystem } from './core/hooks/useSqueezeSystem'
 import { useGameState } from './core/hooks/useGameState'
+import { useGumState } from '../GameState/GumState'
 
 import { GAME_CONSTANTS } from './core/constants/GameConstants'
 
@@ -49,6 +50,9 @@ export const GumPhysicsTest = () => {
     resetGame,
     setPlatformColors
   } = useGameState()
+
+  // GumState hook'unu kullan
+  const gumState = useGumState()
 
   // Çene pozisyonları
   const jawPositions = {
@@ -125,7 +129,8 @@ export const GumPhysicsTest = () => {
         updateGameState(
           chewState.lastChewType,
           chewState.shouldDamagePlayer,
-          chewState.scoreAmount
+          chewState.scoreAmount,
+          false // Normal güncelleme, zafer değil
         )
 
         // Squeeze durumunu güncelle
@@ -147,6 +152,14 @@ export const GumPhysicsTest = () => {
 
   // Oyunu başlatma
   const handlePlay = () => {
+    // Tüm durumları sıfırla
+    resetGame()
+    resetPhysics()
+    resetChewingState()
+    resetSqueezeState()
+    gumState.resetHealth() // Sakızın canını sıfırla
+    
+    // Oyunu başlat
     startGame()
     setPhysicsPaused(false)
   }
@@ -157,22 +170,25 @@ export const GumPhysicsTest = () => {
     resetPhysics()
     resetChewingState()
     resetSqueezeState()
+    gumState.resetHealth() // Sakızın canını sıfırla
     setPhysicsPaused(true)
     setIsSpacePressed(false)
   }
 
   return (
     <div className="flex gap-4">
-      {/* Sol Panel - Game Over */}
+      {/* Sol Panel - Game Over/Victory */}
       <div className="w-64 flex flex-col gap-4">
         {gameState.gameStatus === 'ended' && (
-          <div className="h-full p-4 bg-red-100 text-red-800 rounded-lg text-center font-bold flex flex-col items-center justify-center">
-            <div className="text-2xl mb-4">Game Over!</div>
+          <div className={`h-full p-4 ${gameState.lives <= 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} rounded-lg text-center font-bold flex flex-col items-center justify-center`}>
+            <div className="text-2xl mb-4">
+              {gameState.lives <= 0 ? "Game Over!" : "Victory!"}
+            </div>
             <div className="mb-2">
-              {gameState.lives <= 0 ? "Can hakkınız bitti!" : "Sakız yok edildi!"}
+              {gameState.lives <= 0 ? "YOU GUMMED!" : "GUMJAM IS WASTED!"}
             </div>
             <div className="text-xl mt-4">
-              Final Skor: {gameState.score}
+              Final Score: {gameState.score}
             </div>
           </div>
         )}
@@ -196,11 +212,13 @@ export const GumPhysicsTest = () => {
             maxHealth: 3,
             isAlive: gameState.lives > 0 
           }} />
-          <GumTest state={{ 
-            health: 100, 
-            maxHealth: 100, 
-            isLaughing: false,
-            isAlive: true 
+          <GumTest onVictory={() => {
+            // Sadece sakızın canı 0'a ulaştığında ve oyuncu hayattaysa zafer
+            if (gameState.lives > 0 && gumState.health <= 0) {
+              // Oyunu zaferle bitir ve bonus skor ekle
+              updateGameState('none', false, 1000, true)
+              setPhysicsPaused(true)
+            }
           }} />
         </div>
 

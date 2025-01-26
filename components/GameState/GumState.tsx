@@ -6,6 +6,7 @@ interface GumStateStore {
   isLaughing: boolean
   damageMultiplier: number
   healAmount: number
+  isGameOver: boolean
   
   // Eylemler
   takeDamage: (amount: number) => void
@@ -13,19 +14,26 @@ interface GumStateStore {
   setLaughing: (value: boolean) => void
   resetHealth: () => void
   setDamageMultiplier: (value: number) => void
+  setGameOver: (value: boolean) => void
 }
 
-export const useGumState = create<GumStateStore>((set) => ({
+// GumState store'u
+const useGumState = create<GumStateStore>((set) => ({
   health: 100,
   maxHealth: 100,
   isLaughing: false,
   damageMultiplier: 1,
   healAmount: 5,
+  isGameOver: false,
 
   takeDamage: (amount: number) => 
-    set((state) => ({
-      health: Math.max(0, state.health - (amount * state.damageMultiplier))
-    })),
+    set((state) => {
+      const newHealth = Math.max(0, state.health - (amount * state.damageMultiplier))
+      return {
+        health: newHealth,
+        isGameOver: newHealth <= 0
+      }
+    }),
 
   heal: (amount: number) =>
     set((state) => ({
@@ -36,10 +44,16 @@ export const useGumState = create<GumStateStore>((set) => ({
     set({ isLaughing: value }),
 
   resetHealth: () => 
-    set({ health: 100 }),
+    set({ 
+      health: 100,
+      isGameOver: false 
+    }),
 
   setDamageMultiplier: (value: number) =>
-    set({ damageMultiplier: value })
+    set({ damageMultiplier: value }),
+
+  setGameOver: (value: boolean) =>
+    set({ isGameOver: value })
 }))
 
 // GumState tipi dışa aktarımı
@@ -47,4 +61,8 @@ export type GumState = {
   health: number
   maxHealth: number
   isLaughing: boolean
-} 
+  isGameOver: boolean
+}
+
+// Hook'u dışa aktar
+export { useGumState } 

@@ -19,7 +19,7 @@ interface PhysicsEngineReturn {
   updatePhysics: (isSpacePressed: boolean, jawPositions: { topEdge: number; bottomEdge: number }) => void
   resetPhysics: () => void
   setPhysicsPaused: (isPaused: boolean) => void
-  calculateRandomVelocity: (baseSpeed?: number) => { x: number; y: number }
+  calculateRandomVelocity: (baseSpeed?: number, currentVelocity?: { x: number; y: number }) => { x: number; y: number }
 }
 
 // Başlangıç hızı
@@ -43,11 +43,24 @@ export const usePhysicsEngine = (): PhysicsEngineReturn => {
   const [physics, setPhysics] = useState<PhysicsState>(initialPhysicsState)
 
   // Rastgele hız hesaplama
-  const calculateRandomVelocity = useCallback((baseSpeed: number = PHYSICS_CONSTANTS.BASE_SPEED) => {
+  const calculateRandomVelocity = useCallback((baseSpeed: number = PHYSICS_CONSTANTS.BASE_SPEED, currentVelocity?: { x: number; y: number }) => {
     const angle = PHYSICS_CONSTANTS.MIN_ANGLE + 
       (PHYSICS_CONSTANTS.MAX_ANGLE - PHYSICS_CONSTANTS.MIN_ANGLE) * Math.random()
+    
+    // Eğer mevcut hız varsa, yönü koruyarak varyasyon ekle
+    if (currentVelocity) {
+      const currentAngle = Math.atan2(currentVelocity.y, currentVelocity.x)
+      const variation = (Math.random() - 0.5) * 2 * PHYSICS_CONSTANTS.REBOUND_VARIATION
+      const newAngle = currentAngle + variation
+      
+      return {
+        x: baseSpeed * Math.cos(newAngle),
+        y: baseSpeed * Math.sin(newAngle)
+      }
+    }
+    
+    // Yeni rastgele yön
     const direction = Math.random() > 0.5 ? 1 : -1
-
     return {
       x: baseSpeed * Math.cos(angle) * direction,
       y: baseSpeed * Math.sin(angle)
@@ -113,7 +126,12 @@ export const usePhysicsEngine = (): PhysicsEngineReturn => {
       // Üst sekme noktası
       if (newPhysics.position.y <= jawPositions.topEdge) {
         isBouncingNow = true
-        const newVelocity = calculateRandomVelocity()
+        
+        // Mevcut hızı kullanarak yeni hız hesapla
+        const currentSpeed = Math.sqrt(newPhysics.velocity.x ** 2 + newPhysics.velocity.y ** 2)
+        const retainedSpeed = currentSpeed * PHYSICS_CONSTANTS.VELOCITY_RETENTION
+        const newVelocity = calculateRandomVelocity(retainedSpeed, newPhysics.velocity)
+        
         newPhysics.velocity = {
           x: newVelocity.x,
           y: Math.abs(newVelocity.y) // Aşağı yönlendir
@@ -124,7 +142,12 @@ export const usePhysicsEngine = (): PhysicsEngineReturn => {
       // Alt sekme noktası
       if (newPhysics.position.y >= jawPositions.bottomEdge) {
         isBouncingNow = true
-        const newVelocity = calculateRandomVelocity()
+        
+        // Mevcut hızı kullanarak yeni hız hesapla
+        const currentSpeed = Math.sqrt(newPhysics.velocity.x ** 2 + newPhysics.velocity.y ** 2)
+        const retainedSpeed = currentSpeed * PHYSICS_CONSTANTS.VELOCITY_RETENTION
+        const newVelocity = calculateRandomVelocity(retainedSpeed, newPhysics.velocity)
+        
         newPhysics.velocity = {
           x: newVelocity.x,
           y: -Math.abs(newVelocity.y) // Yukarı yönlendir
@@ -134,15 +157,21 @@ export const usePhysicsEngine = (): PhysicsEngineReturn => {
 
       // Sakız şekil değişimi
       if (isBouncingNow) {
-        const compression = PHYSICS_CONSTANTS.COMPRESSION_RATIO
+        // Hıza bağlı sıkışma oranı
+        const speed = Math.sqrt(newPhysics.velocity.x ** 2 + newPhysics.velocity.y ** 2)
+        const speedRatio = Math.min(speed / PHYSICS_CONSTANTS.MAX_SPEED, 1)
+        const dynamicCompression = PHYSICS_CONSTANTS.MIN_COMPRESSION + 
+          (PHYSICS_CONSTANTS.MAX_COMPRESSION - PHYSICS_CONSTANTS.MIN_COMPRESSION) * speedRatio
+        
         newPhysics.scale = {
-          x: compression,
-          y: 1 / compression
+          x: dynamicCompression,
+          y: 1 / dynamicCompression
         }
       } else {
+        // Kademeli şekil düzeltme
         newPhysics.scale = {
-          x: 1 + (newPhysics.scale.x - 1) * 0.8,
-          y: 1 + (newPhysics.scale.y - 1) * 0.8
+          x: 1 + (newPhysics.scale.x - 1) * 0.9,
+          y: 1 + (newPhysics.scale.y - 1) * 0.9
         }
       }
 

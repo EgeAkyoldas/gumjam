@@ -2,25 +2,25 @@ export const CHEWING_CONSTANTS = {
   // Çiğneme bölgeleri
   ZONES: {
     PERFECT: {
-      SIZE: 20,
+      SIZE: 15,     // Çeneye en yakın 15px
       SCORE: 100,
-      DAMAGE: 15
+      DAMAGE: 10    // Perfect vuruş hasarı
     },
     GOOD: {
-      SIZE: 40,
+      SIZE: 25,     // Perfect'ten sonraki 25px
       SCORE: 50,
-      DAMAGE: 10
+      DAMAGE: 5     // Good vuruş hasarı
     },
     EARLY: {
-      SIZE: 60,
+      SIZE: 150,    // Geri kalan tüm alan
       SCORE: 0,
-      DAMAGE: 1,
+      DAMAGE: 0,    // Early'de hasar yok
       HEALTH_PENALTY: 1
     },
     LATE: {
-      SCORE: 0,
-      DAMAGE: 1,
-      HEALTH_PENALTY: 1
+      SCORE: -50,
+      DAMAGE: 0,    // Late'de hasar yok
+      HEALTH_PENALTY: 2
     }
   },
 
@@ -61,7 +61,7 @@ export type ChewType = 'none' | 'perfect' | 'good' | 'early' | 'late'
 export const CHEW_ZONE_COLORS = {
   PERFECT: 'bg-gradient-to-r from-green-400 to-green-500',
   GOOD: 'bg-gradient-to-r from-yellow-400 to-yellow-500',
-  EARLY: 'bg-gradient-to-r from-orange-400 to-orange-500',
-  LATE: 'bg-gradient-to-r from-red-400 to-red-500',
+  EARLY: 'bg-gradient-to-r from-red-400 to-red-500',
+  LATE: 'bg-gradient-to-r from-red-600 to-red-700',
   NONE: 'bg-gradient-to-r from-gray-200 to-gray-300'
 } as const 

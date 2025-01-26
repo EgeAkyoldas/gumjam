@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { CHEWING_CONSTANTS, ChewType, CHEW_ZONE_COLORS } from '../constants/ChewingConstants'
+import { useGumState } from '../../../GameState/GumState'
 
 // Çiğneme durumu için interface
 interface ChewingState {
@@ -48,6 +49,7 @@ const initialChewState: ChewingState = {
 
 export const useChewingSystem = (): ChewingSystemReturn => {
   const [chewState, setChewState] = useState<ChewingState>(initialChewState)
+  const { takeDamage, setLaughing } = useGumState()
 
   // Çiğneme bölgesi hesaplama
   const calculateChewZone = useCallback((
@@ -58,15 +60,18 @@ export const useChewingSystem = (): ChewingSystemReturn => {
     isBouncing: boolean,
     isSpacePressed: boolean
   ): ChewType => {
-    const distance = Math.abs(gumPosition - jawPosition)
     const direction = velocity.y < 0 ? 'up' : 'down'
     const isMovingTowardsJaw = (isTopJaw && direction === 'up') || (!isTopJaw && direction === 'down')
+    const isWrongDirection = (isTopJaw && direction === 'down') || (!isTopJaw && direction === 'up')
+
+    // Hedef çeneye olan mesafe
+    const targetJawDistance = Math.abs(gumPosition - jawPosition)
 
     // Debug için mesafe bilgilerini logla
     console.log('%c[ZONE] Mesafe Kontrolü:', 'color: cyan', {
       gumPosition,
       jawPosition,
-      distance,
+      targetJawDistance,
       direction,
       isTopJaw,
       velocity,
@@ -75,47 +80,53 @@ export const useChewingSystem = (): ChewingSystemReturn => {
       isMovingTowardsJaw
     })
 
-    // Bölge sınırlarını hesapla
-    const perfectZone = CHEWING_CONSTANTS.ZONES.PERFECT.SIZE
-    const goodZone = perfectZone + CHEWING_CONSTANTS.ZONES.GOOD.SIZE
-    const earlyZone = goodZone + CHEWING_CONSTANTS.ZONES.EARLY.SIZE
+    // Late durumu kontrolü
+    if ((isBouncing && !isSpacePressed) || isWrongDirection) {
+      console.log('%c[ZONE] Late Tespit!', 'color: red', {
+        sebep: 'Late durumu tespit edildi',
+        isBouncing,
+        isSpacePressed,
+        isWrongDirection,
+        gumPosition,
+        jawPosition
+      })
+      return 'late'
+    }
 
-    // Space basılıysa ve çeneye yaklaşıyorsa
+    // Space basılıysa ve doğru yönde hareket ediyorsa
     if (isSpacePressed && isMovingTowardsJaw) {
-      // Perfect ve Good kontrolü
-      if (distance <= perfectZone) {
+      // Bölge sınırlarını hesapla
+      const perfectEnd = CHEWING_CONSTANTS.ZONES.PERFECT.SIZE
+      const goodEnd = perfectEnd + CHEWING_CONSTANTS.ZONES.GOOD.SIZE
+
+      // Perfect ve Good bölgeleri kontrolü
+      if (targetJawDistance <= perfectEnd) {
         console.log('%c[ZONE] Perfect Tespit!', 'color: green', {
-          distance,
-          perfectZone
+          distance: targetJawDistance,
+          perfectEnd,
+          direction,
+          targetJaw: direction === 'up' ? 'Üst Çene' : 'Alt Çene'
         })
         return 'perfect'
-      } else if (distance <= goodZone) {
+      } else if (targetJawDistance <= goodEnd) {
         console.log('%c[ZONE] Good Tespit!', 'color: yellow', {
-          distance,
-          goodZone
+          distance: targetJawDistance,
+          goodEnd,
+          direction,
+          targetJaw: direction === 'up' ? 'Üst Çene' : 'Alt Çene'
         })
         return 'good'
-      } else if (distance <= earlyZone) {
-        console.log('%c[ZONE] Early Tespit!', 'color: orange', {
-          distance,
-          earlyZone,
-          sebep: 'Çeneye çok uzak ve yaklaşıyor'
+      } else {
+        // Perfect ve Good dışındaki tüm alan Early
+        console.log('%c[ZONE] Early Tespit!', 'color: red', {
+          distance: targetJawDistance,
+          direction,
+          targetJaw: direction === 'up' ? 'Üst Çene' : 'Alt Çene'
         })
         return 'early'
       }
     }
-
-    // Late durumu kontrolü - Sakız sekerken space basılmadıysa
-    if (isBouncing && !isSpacePressed && distance <= goodZone) {
-      console.log('%c[ZONE] Late Tespit!', 'color: red', {
-        sebep: 'Space basılmadı ve sakız sekti',
-        distance,
-        direction
-      })
-      return 'late'
-    }
     
-    // Hiçbir koşula uymuyorsa none
     return 'none'
   }, [])
 
@@ -141,6 +152,11 @@ export const useChewingSystem = (): ChewingSystemReturn => {
         newState.scoreAmount = CHEWING_CONSTANTS.SQUEEZE.SCORE
         newState.combo = 0
         newState.lastChewTime = now
+
+        // Sakıza hasar ver
+        takeDamage(CHEWING_CONSTANTS.SQUEEZE.DAMAGE)
+        setLaughing(true)
+        setTimeout(() => setLaughing(false), 1000)
 
         console.log('%c[SQUEEZE] Başarılı!', 'color: purple', {
           damage: CHEWING_CONSTANTS.SQUEEZE.DAMAGE,
@@ -210,19 +226,6 @@ export const useChewingSystem = (): ChewingSystemReturn => {
         }
       }
 
-      // Late durumu için cooldown kontrolü
-      if (chewType === 'late') {
-        const lateCooldown = 500 // 500ms cooldown
-        if (prev.lastChewTime && now - prev.lastChewTime < lateCooldown) {
-          console.log('%c[CHEW] Late immune!', 'color: red', {
-            timeSinceLastChew: now - prev.lastChewTime,
-            cooldown: lateCooldown,
-            message: 'Late hasarına karşı bağışıklık'
-          })
-          return prev
-        }
-      }
-
       // Çiğneme tipine göre durumu güncelle
       switch (chewType) {
         case 'perfect':
@@ -230,11 +233,17 @@ export const useChewingSystem = (): ChewingSystemReturn => {
           newState.shouldDamagePlayer = false
           newState.damageAmount = CHEWING_CONSTANTS.ZONES.PERFECT.DAMAGE
           newState.scoreAmount = CHEWING_CONSTANTS.ZONES.PERFECT.SCORE
-          newState.combo += CHEWING_CONSTANTS.COMBO.PERFECT_INCREASE // Perfect için +2 combo
+          newState.combo += CHEWING_CONSTANTS.COMBO.PERFECT_INCREASE
           newState.meterValue = Math.min(
             CHEWING_CONSTANTS.METER.MAX_VALUE,
             newState.meterValue + CHEWING_CONSTANTS.METER.PERFECT_INCREASE
           )
+          
+          // Sakıza hasar ver
+          takeDamage(CHEWING_CONSTANTS.ZONES.PERFECT.DAMAGE)
+          setLaughing(true)
+          setTimeout(() => setLaughing(false), 500)
+
           console.log('%c[CHEW] Perfect Success!', 'color: green', {
             damage: newState.damageAmount,
             score: newState.scoreAmount,
@@ -249,11 +258,15 @@ export const useChewingSystem = (): ChewingSystemReturn => {
           newState.shouldDamagePlayer = false
           newState.damageAmount = CHEWING_CONSTANTS.ZONES.GOOD.DAMAGE
           newState.scoreAmount = CHEWING_CONSTANTS.ZONES.GOOD.SCORE
-          newState.combo += CHEWING_CONSTANTS.COMBO.GOOD_INCREASE // Good için +1 combo
+          newState.combo += CHEWING_CONSTANTS.COMBO.GOOD_INCREASE
           newState.meterValue = Math.min(
             CHEWING_CONSTANTS.METER.MAX_VALUE,
             newState.meterValue + CHEWING_CONSTANTS.METER.GOOD_INCREASE
           )
+
+          // Sakıza hasar ver
+          takeDamage(CHEWING_CONSTANTS.ZONES.GOOD.DAMAGE)
+
           console.log('%c[CHEW] Good Success!', 'color: yellow', {
             damage: newState.damageAmount,
             score: newState.scoreAmount,
@@ -280,18 +293,19 @@ export const useChewingSystem = (): ChewingSystemReturn => {
           break
 
         case 'late':
-          newState.shouldDamageGum = false
           newState.shouldDamagePlayer = true
+          newState.shouldDamageGum = false
           newState.damageAmount = CHEWING_CONSTANTS.ZONES.LATE.HEALTH_PENALTY
           newState.scoreAmount = CHEWING_CONSTANTS.ZONES.LATE.SCORE
-          newState.combo = 0 // Late durumunda combo sıfırlanır
-          newState.meterValue = 0
-          console.log('%c[CHEW] Late Unsuccessful!', 'color: red', {
-            combo: newState.combo,
-            meter: newState.meterValue,
-            shouldDamagePlayer: newState.shouldDamagePlayer,
-            damageAmount: newState.damageAmount,
-            message: 'Geç çiğneme - Combo sıfırlandı!'
+          newState.combo = 0 // Combo sıfırlanır
+          newState.meterValue = 0 // Meter sıfırlanır
+
+          console.log('%c[CHEW] Late Penalty!', 'color: red', {
+            healthPenalty: newState.damageAmount,
+            score: newState.scoreAmount,
+            combo: 0,
+            meter: 0,
+            message: 'Late! Combo ve Meter Sıfırlandı'
           })
           break
 
@@ -312,7 +326,7 @@ export const useChewingSystem = (): ChewingSystemReturn => {
 
       return newState
     })
-  }, [calculateChewZone])
+  }, [calculateChewZone, takeDamage, setLaughing])
 
   // Çiğneme durumunu sıfırlama
   const resetChewingState = useCallback(() => {

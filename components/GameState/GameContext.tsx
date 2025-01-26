@@ -24,7 +24,6 @@ type GameAction =
   | { type: "UPDATE_SCORE"; payload: number }
   | { type: "DECREASE_LIVES" }
   | { type: "UPDATE_DURABILITY"; payload: number }
-  | { type: "GAME_OVER" }
   | { type: "START_CHEWING" }
   | { type: "STOP_CHEWING" }
   | { type: "MOVE_TONGUE"; payload: "left" | "center" | "right" }
@@ -33,21 +32,20 @@ type GameAction =
   | { type: "UPDATE_GUM_SPEED"; payload: number }
   | { type: "UPDATE_UPPER_BOUNDARY"; payload: number }
   | { type: "UPDATE_LOWER_BOUNDARY"; payload: number }
-  | { type: "TAKE_DAMAGE"; payload: number }
 
 const initialState: GameState = {
   score: 0,
   lives: 3,
   durability: 100,
-  isPlaying: false,
+  isPlaying: true, // Oyun her zaman aktif
   isPaused: false,
   isChewing: false,
   tonguePosition: "center",
   gumPosition: { x: 0, y: 0 },
   gumVelocity: { x: 0, y: 0 },
-  gumSpeed: 1, // Changed from 5 to 1
-  upperBoundary: 0.22, // Changed from 0.3 to 0.22 (22%)
-  lowerBoundary: 0.63, // Changed from 0.7 to 0.63 (63%)
+  gumSpeed: 1,
+  upperBoundary: 0.22,
+  lowerBoundary: 0.63,
 }
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
@@ -61,11 +59,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case "UPDATE_SCORE":
       return { ...state, score: state.score + action.payload }
     case "DECREASE_LIVES":
-      return { ...state, lives: state.lives - 1 }
+      // Can kaybı sistemini devre dışı bırak
+      return state
     case "UPDATE_DURABILITY":
       return { ...state, durability: action.payload }
-    case "GAME_OVER":
-      return { ...state, isPlaying: false }
     case "START_CHEWING":
       return { ...state, isChewing: true }
     case "STOP_CHEWING":
@@ -82,13 +79,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       return { ...state, upperBoundary: action.payload }
     case "UPDATE_LOWER_BOUNDARY":
       return { ...state, lowerBoundary: action.payload }
-    case "TAKE_DAMAGE":
-      const newLives = state.lives - action.payload
-      return {
-        ...state,
-        lives: newLives,
-        isPlaying: newLives > 0, // Game over if lives reach 0
-      }
     default:
       return state
   }

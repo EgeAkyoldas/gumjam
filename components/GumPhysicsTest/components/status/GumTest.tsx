@@ -1,4 +1,4 @@
-import { GumState } from '../GameState/GumState'
+import { GumState } from '../../../GameState/GumState'
 import { motion } from 'framer-motion'
 
 interface GumTestProps {

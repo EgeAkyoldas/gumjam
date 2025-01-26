@@ -5,14 +5,14 @@ export const CHEW_ZONES = {
   
   // Bölge çarpanları (x)
   ZONE_MULTIPLIERS: {
-    PERFECT: 2,     // Yeşil bölge: 1x
-    GOOD: 4,        // Sarı bölge: 2x
-    EARLY_LATE: 9  // Kırmızı bölge: 12x
+    PERFECT: 3,     // Yeşil bölge: 3x
+    GOOD: 5,        // Sarı bölge: 5x
+    EARLY_LATE: 7   // Kırmızı bölge: 7x
   },
 
   // Bölge boyutları (piksel)
   get ZONE_SIZES() {
-    // Toplam çarpan: 15x (1 + 2 + 12)
+    // Toplam çarpan: 15x
     const totalMultiplier = 
       this.ZONE_MULTIPLIERS.PERFECT + 
       this.ZONE_MULTIPLIERS.GOOD + 
@@ -22,11 +22,10 @@ export const CHEW_ZONES = {
     const baseUnit = this.TOTAL_GAP / totalMultiplier
 
     // Bölge boyutlarını hesapla
-    const perfect = baseUnit * this.ZONE_MULTIPLIERS.PERFECT     // 20px (1x)
-    const good = baseUnit * this.ZONE_MULTIPLIERS.GOOD           // 40px (2x)
-    const earlyLate = baseUnit * this.ZONE_MULTIPLIERS.EARLY_LATE // 90px (12x)
+    const perfect = baseUnit * this.ZONE_MULTIPLIERS.PERFECT     // 30px
+    const good = baseUnit * this.ZONE_MULTIPLIERS.GOOD           // 50px
+    const earlyLate = baseUnit * this.ZONE_MULTIPLIERS.EARLY_LATE // 70px
 
-    // Bölge sınırları (başlangıç ve bitiş noktaları)
     return {
       PERFECT_START: 0,
       PERFECT_END: perfect,
@@ -38,16 +37,26 @@ export const CHEW_ZONES = {
   }
 }
 
-// Çiğneme durumu tipleri
+// Çiğneme durumları
 export type ChewType = 'none' | 'perfect' | 'good' | 'early' | 'late'
 
 // Çiğneme bölgesi hesaplama
 export const calculateChewZone = (
   gumPosition: number,
-  jawPosition: number
+  jawPosition: number,
+  velocity: { x: number; y: number }
 ): ChewType => {
   const distance = Math.abs(gumPosition - jawPosition)
   const zones = CHEW_ZONES.ZONE_SIZES
+  const direction = velocity.y < 0 ? 'up' : 'down'
+
+  // Hareket yönüne göre bölge kontrolü
+  if (direction === 'up' && gumPosition > jawPosition) {
+    return 'late'
+  }
+  if (direction === 'down' && gumPosition < jawPosition) {
+    return 'late'
+  }
 
   if (distance <= zones.PERFECT_END) {
     return 'perfect'
@@ -60,19 +69,19 @@ export const calculateChewZone = (
   }
 }
 
-// Çiğneme durumuna göre renk belirleme
+// Çiğneme bölgesi renklerini belirle
 export const getChewZoneColor = (chewType: ChewType): string => {
   switch (chewType) {
     case 'perfect':
-      return 'bg-green-400'
+      return 'bg-gradient-to-r from-green-400 to-green-500'
     case 'good':
-      return 'bg-yellow-400'
+      return 'bg-gradient-to-r from-yellow-400 to-yellow-500'
     case 'early':
-      return 'bg-orange-400'
+      return 'bg-gradient-to-r from-orange-400 to-orange-500'
     case 'late':
-      return 'bg-red-400'
+      return 'bg-gradient-to-r from-red-400 to-red-500'
     default:
-      return 'bg-white'
+      return 'bg-gradient-to-r from-gray-200 to-gray-300'
   }
 }
 
@@ -86,7 +95,7 @@ export const calculateChewScore = (chewType: ChewType): number => {
     case 'early':
       return 0
     case 'late':
-      return 10
+      return -30
     default:
       return 0
   }
@@ -120,7 +129,7 @@ export const CHEW_CONSTANTS = {
   DAMAGE: {
     PERFECT: 15,    // Perfect çiğneme hasarı
     GOOD: 10,       // Good çiğneme hasarı
-    EARLY: 0,       // Early durumunda hasar yok
+    EARLY: 1,       // Early durumunda 1 hasar
     SQUEEZE: 30     // Squeeze hasarı
   },
   SCORE: {
@@ -142,6 +151,27 @@ export const CHEW_CONSTANTS = {
   }
 }
 
+// Log detayları için interface
+interface ChewLogDetails {
+  damage?: number
+  score?: number
+  comboIncrease?: number
+  comboDecrease?: number
+  newCombo?: number
+  comboReset?: boolean
+  playerDamage?: number
+  gumDamage?: number
+  distances?: {
+    fromTop: number
+    fromBottom: number
+  }
+}
+
+// Log fonksiyonu
+const logChewAction = (actionType: string, details: ChewLogDetails) => {
+  console.log(`[CHEW ACTION] ${actionType}`, details)
+}
+
 // Çiğneme durumu güncelleme
 export const updateChewingState = (
   gumY: number,
@@ -152,35 +182,6 @@ export const updateChewingState = (
   isBouncingNow: boolean,
   isSqueezing: boolean = false
 ): ChewingState => {
-  // Log detayları için tip
-  interface ChewLogDetails {
-    damage?: number
-    score?: number
-    playerDamage?: number
-    comboIncrease?: number
-    comboDecrease?: number
-    comboReset?: boolean
-    newCombo?: number
-    distances?: {
-      fromTop: number
-      fromBottom: number
-    }
-  }
-
-  // Debug log için yardımcı fonksiyon
-  const logChewAction = (action: string, details: ChewLogDetails) => {
-    console.log(`%c[CHEW ACTION] ${action}`, 'color: #ff69b4', {
-      ...details,
-      timestamp: new Date().toISOString(),
-      gumPosition: gumY,
-      topEdge,
-      bottomEdge,
-      isBouncingNow,
-      isSqueezing,
-      currentCombo: currentState.combo
-    })
-  }
-
   const newState: ChewingState = {
     ...currentState,
     shouldDamagePlayer: false,
@@ -248,8 +249,8 @@ export const updateChewingState = (
 
     if (chewType === 'perfect') {
       newState.lastChewType = 'perfect'
-      newState.shouldDamageGum = true
-      newState.shouldDamagePlayer = false
+      newState.shouldDamageGum = true        // Sakız hasar alır
+      newState.shouldDamagePlayer = false    // Oyuncu hasar almaz
       newState.damageAmount = CHEW_CONSTANTS.DAMAGE.PERFECT
       newState.scoreAmount = CHEW_CONSTANTS.SCORE.PERFECT
       newState.combo += CHEW_CONSTANTS.COMBO.PERFECT_INCREASE
@@ -258,13 +259,14 @@ export const updateChewingState = (
         damage: CHEW_CONSTANTS.DAMAGE.PERFECT,
         score: CHEW_CONSTANTS.SCORE.PERFECT,
         comboIncrease: CHEW_CONSTANTS.COMBO.PERFECT_INCREASE,
-        newCombo: newState.combo
+        newCombo: newState.combo,
+        gumDamage: CHEW_CONSTANTS.DAMAGE.PERFECT
       })
 
     } else if (chewType === 'good') {
       newState.lastChewType = 'good'
-      newState.shouldDamageGum = true
-      newState.shouldDamagePlayer = false
+      newState.shouldDamageGum = true        // Sakız hasar alır
+      newState.shouldDamagePlayer = false    // Oyuncu hasar almaz
       newState.damageAmount = CHEW_CONSTANTS.DAMAGE.GOOD
       newState.scoreAmount = CHEW_CONSTANTS.SCORE.GOOD
       newState.combo += CHEW_CONSTANTS.COMBO.GOOD_INCREASE
@@ -273,27 +275,32 @@ export const updateChewingState = (
         damage: CHEW_CONSTANTS.DAMAGE.GOOD,
         score: CHEW_CONSTANTS.SCORE.GOOD,
         comboIncrease: CHEW_CONSTANTS.COMBO.GOOD_INCREASE,
-        newCombo: newState.combo
+        newCombo: newState.combo,
+        gumDamage: CHEW_CONSTANTS.DAMAGE.GOOD
       })
 
     } else if (chewType === 'early') {
       newState.lastChewType = 'early'
-      newState.shouldDamageGum = false
-      newState.shouldDamagePlayer = false
+      newState.shouldDamageGum = false       // Sakız hasar almaz
+      newState.shouldDamagePlayer = true     // Oyuncu hasar alır
+      newState.damageAmount = CHEW_CONSTANTS.DAMAGE.EARLY
+      newState.scoreAmount = 0
       newState.combo = Math.max(0, newState.combo - CHEW_CONSTANTS.COMBO.EARLY_DECREASE)
 
       logChewAction('EARLY CHEW', {
+        playerDamage: CHEW_CONSTANTS.DAMAGE.EARLY,
         comboDecrease: CHEW_CONSTANTS.COMBO.EARLY_DECREASE,
-        newCombo: newState.combo
+        newCombo: newState.combo,
+        message: 'Early çiğneme - Can kaybı aktif'
       })
 
     } else if (chewType === 'late') {
-      // Sadece 'late' durumunda oyuncu hasar alır
       newState.lastChewType = 'late'
-      newState.shouldDamagePlayer = true
-      newState.shouldDamageGum = false
-      newState.combo = 0
+      newState.shouldDamageGum = false       // Sakız hasar almaz
+      newState.shouldDamagePlayer = true     // Oyuncu hasar alır
+      newState.damageAmount = 0
       newState.scoreAmount = 0
+      newState.combo = 0
 
       logChewAction('LATE CHEW', {
         playerDamage: 1,
